@@ -22,6 +22,7 @@ class CreateMUserTable extends Migration
             $table->rememberToken();
             $table->timestamps();
         });
+        
     }
 
     /**

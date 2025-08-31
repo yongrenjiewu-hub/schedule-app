@@ -72,6 +72,7 @@ class MPatientController extends Controller
     //patient登録処理・バリデーション処理はRequestファイルに専用のクラス作成
     public function store(StorePatientRequest $request)
     {
+        //患者情報更新が失敗したらログ出力
         try {
             // sex が 0〜3 以外の場合、一覧にリダイレクト
             if (!in_array($request->sex, [0, 1, 2, 3])) {
@@ -101,6 +102,7 @@ class MPatientController extends Controller
             return redirect()->route('patient.index');
         } catch (Exception $e) {
             // ログなど
+            Log::error('患者情報更新エラーログです');
         }
     }
 
@@ -290,6 +292,7 @@ class MPatientController extends Controller
             'medicine.*' => 'nullable|string|max:255', // drug_nameベースなら文字列バリデーション
         ]);
 
+        //更新処理に失敗したらログ出力
         try {
             $today = Carbon::now('Asia/Tokyo')->startOfDay()->toDateString();
 
