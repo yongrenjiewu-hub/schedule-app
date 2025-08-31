@@ -43,27 +43,22 @@ class TPtscheduleController extends Controller
                 ]);
             }
         ])
-        ->where('user_id', $userId)
-        ->get();
+            ->where('user_id', $userId)
+            ->get()
+            ->unique('pt_id'); // ← 重複患者を排除
+
+        $patients = $assignedPatients
+        ->pluck('patient')
+        ->filter()
+        ->unique('pt_id')
+        ->groupBy('room_id');
         
+
         // TAssigned ではなく patient を groupBy
         $groupedPatients = $assignedPatients
             ->pluck('patient')
             ->filter()
             ->groupBy('room_id');
-        
-
-        $patients = TAssigned::with([
-            'patient.ptSchedules.treatmentkind.treatmentkindMaster',
-            'patient.ptSchedules.carekind.carekindMaster',
-            'patient.ptSchedules.dialysis.dialysisMaster',
-            'patient.ptSchedules.meals',
-            'patient.ptSchedules.medicines.medicineMaster',
-        ])
-        ->where('user_id', $userId)
-        ->get()
-        ->pluck('patient')
-        ->groupBy('room_id'); 
 
         // $idがnullなら最初の患者IDをセット
         if (is_null($id)) {
@@ -77,16 +72,17 @@ class TPtscheduleController extends Controller
             $m_patient = MPatient::with('ptSchedulesAll.medicines.medicineMaster')->find($id);
         }
 
-        $t_pt_schedule = TPtschedule::with(['medicines' => function($query) use ($today) {
-            $query->whereDate('daily_schedule_date', $today);
-        },'meals' => function($query) use ($today) {
-        $query->whereDate('daily_schedule_date', $today);
-        }
+        $t_pt_schedule = TPtschedule::with([
+            'medicines' => function ($query) use ($today) {
+                $query->whereDate('daily_schedule_date', $today);
+            },
+            'meals' => function ($query) use ($today) {
+                $query->whereDate('daily_schedule_date', $today);
+            }
         ])
-        ->where('pt_id', $id)
-        ->whereDate('daily_schedule_date', $today)
-        ->first();
-
+            ->where('pt_id', $id)
+            ->whereDate('daily_schedule_date', $today)
+            ->first();
         //薬マスタ情報取得
         $m_medicine = MMedicine::all();
 
@@ -99,14 +95,15 @@ class TPtscheduleController extends Controller
         } else {
             // GET時はDBから取得
             $selectedMedicineIds = $t_pt_schedule->medicines->pluck('medicine_id')->toArray();
+
         }
-    
+
 
         // 1つの共通配列に変換して sortBy する
         foreach ($assignedPatients as $assigned) {
             foreach ($assigned->patient->ptSchedules as $schedule) {
                 $allItems = collect();
-        
+
                 // === ケア
                 foreach ($schedule->carekind as $item) {
                     $master = $item->carekindMaster;
@@ -125,7 +122,7 @@ class TPtscheduleController extends Controller
                         }
                     }
                 }
-        
+
                 // === 治療
                 foreach ($schedule->treatmentkind as $item) {
                     $master = $item->treatmentkindMaster;
@@ -144,7 +141,7 @@ class TPtscheduleController extends Controller
                         }
                     }
                 }
-        
+
                 // === 透析
                 foreach ($schedule->dialysis as $item) {
                     $master = $item->dialysisMaster;
@@ -158,7 +155,7 @@ class TPtscheduleController extends Controller
                         ]);
                     }
                 }
-        
+
                 // === 食事
                 $meals = $schedule->meals ?? collect();
                 foreach ($meals as $meal) {
@@ -173,7 +170,7 @@ class TPtscheduleController extends Controller
                         ]);
                     }
                 }
-        
+
                 // === 薬
                 foreach ($schedule->medicines as $medicine) {
                     $master = $medicine->medicineMaster;
@@ -187,12 +184,12 @@ class TPtscheduleController extends Controller
                         ]);
                     }
                 }
-        
+
                 // === 時間でソート
                 $schedule->sortedItems = $allItems->sortBy('time')->values();
             }
         }
-        
+
 
 
         return view('schedule.index', compact(
@@ -202,20 +199,21 @@ class TPtscheduleController extends Controller
             'patients',
             'groupedPatients',
             'm_medicine',
-            'selectedMedicineIds'));
+            'selectedMedicineIds'
+        ));
     }
 
     public function getSchedulesFiltered($pt_id, $date)
     {
         // まず患者のスケジュール取得（日付で絞り込み）
         $schedules = TPtschedule::where('pt_id', $pt_id)
-                                ->where('daily_schedule_date', $date)
-                                ->get();
+            ->where('daily_schedule_date', $date)
+            ->get();
 
         // 透析（TPtDialysis）は pt_id と日付で絞る
         $dialysis = TPtDialysis::where('pt_id', $pt_id)
-                            ->where('daily_schedule_date', $date)
-                            ->get();
+            ->where('daily_schedule_date', $date)
+            ->get();
 
         // 薬（TMedicine）は pt_schedule_id で紐づくけど、
         // まず該当スケジュールIDを取得してそれで絞り込み
@@ -230,15 +228,15 @@ class TPtscheduleController extends Controller
 
         // 治療（TTreatmentkind）は pt_id と日付で絞る
         $treatmentKinds = TTreatmentkind::where('pt_id', $pt_id)
-                                    ->where('daily_schedule_date', $date)
-                                    ->get();
+            ->where('daily_schedule_date', $date)
+            ->get();
 
         // ケア（TCarekind）も pt_id と日付で絞る
         $careKinds = TCarekind::where('pt_id', $pt_id)
-                            ->where('daily_schedule_date', $date)
-                            ->get();
+            ->where('daily_schedule_date', $date)
+            ->get();
 
-        
+
         return compact('schedules', 'dialysis', 'medicines', 'meals', 'treatmentKinds', 'careKinds');
     }
 
@@ -273,9 +271,9 @@ class TPtscheduleController extends Controller
 
     public function destroyMedicine($id)
     {
-    $medicine = TMedicine::findOrFail($id);
-    $medicine->delete();
-    return back()->with('message', '薬を削除しました');
+        $medicine = TMedicine::findOrFail($id);
+        $medicine->delete();
+        return back()->with('message', '薬を削除しました');
     }
 
 

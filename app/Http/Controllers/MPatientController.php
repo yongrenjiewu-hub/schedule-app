@@ -72,6 +72,7 @@ class MPatientController extends Controller
     //patient登録処理・バリデーション処理はRequestファイルに専用のクラス作成
     public function store(StorePatientRequest $request)
     {
+        //患者情報更新が失敗したらログ出力
         try {
             // sex が 0〜3 以外の場合、一覧にリダイレクト
             if (!in_array($request->sex, [0, 1, 2, 3])) {
@@ -101,6 +102,7 @@ class MPatientController extends Controller
             return redirect()->route('patient.index');
         } catch (Exception $e) {
             // ログなど
+            Log::error('患者情報更新エラーログです');
         }
     }
 
@@ -290,123 +292,129 @@ class MPatientController extends Controller
             'medicine.*' => 'nullable|string|max:255', // drug_nameベースなら文字列バリデーション
         ]);
 
+        //更新処理に失敗したらログ出力
+        try {
+            $today = Carbon::now('Asia/Tokyo')->startOfDay()->toDateString();
 
-        $today = Carbon::now('Asia/Tokyo')->startOfDay()->toDateString();
+            // ===== スケジュール作成・更新 =====
+            $ptSchedule = TPtschedule::updateOrCreate(
+                ['pt_id' => $pt_id, 'daily_schedule_date' => $today],
+                // ['meal_id' => $request->input('meal')]
+            );
+            $pt_schedule_id = $ptSchedule->pt_schedule_id;
 
-        // ===== [1] スケジュール作成・更新 =====
-        $ptSchedule = TPtschedule::updateOrCreate(
-            ['pt_id' => $pt_id, 'daily_schedule_date' => $today],
-            // ['meal_id' => $request->input('meal')]
-        );
-        $pt_schedule_id = $ptSchedule->pt_schedule_id;
+            // ===== 透析の更新 =====
+            TPtDialysis::where('pt_id', $pt_id)
+                ->whereDate('daily_schedule_date', $today)
+                ->delete();
 
-        // ===== [2] 透析の更新 =====
-        TPtDialysis::where('pt_id', $pt_id)
-            ->whereDate('daily_schedule_date', $today)
-            ->delete();
-
-        foreach ($request->input('dialysis', []) as $part) {
-            if (!empty($part)) {
-                TPtDialysis::create([
-                    'pt_id' => $pt_id,
-                    't_pt_dialysis_part' => $part,
-                    'daily_schedule_date' => $today,
-                ]);
-            }
-        }
-
-        // ===== [3] 看護ケアの更新 =====
-        TCarekind::where('pt_id', $pt_id)
-            ->whereDate('daily_schedule_date', $today)
-            ->delete();
-
-        foreach (array_filter($request->input('care', [])) as $care_id) {
-            if (!empty($care_id)) {
-                TCarekind::create([
-                    'pt_id' => $pt_id,
-                    'care_kind_id' => $care_id,
-                    'daily_schedule_date' => $today,
-                    'pt_schedule_id' => $pt_schedule_id,
-                ]);
-            }
-        }
-
-        // ===== [4] 治療データの更新 =====
-        TTreatmentkind::where('pt_id', $pt_id)
-            ->whereDate('daily_schedule_date', $today)
-            ->delete();
-
-        $treatmentkindArray = $request->input('treatment', []); // ['treatment' => [id, id], ...]
-
-        foreach ($treatmentkindArray as $category => $treatmentIds) {
-            foreach ($treatmentIds as $treatment_id) {
-                if (!empty($treatment_id)) {
-                    TTreatmentkind::create([
+            foreach ($request->input('dialysis', []) as $part) {
+                if (!empty($part)) {
+                    TPtDialysis::create([
                         'pt_id' => $pt_id,
-                        'treatment_kind_id' => $treatment_id,
+                        't_pt_dialysis_part' => $part,
                         'daily_schedule_date' => $today,
-                        'pt_schedule_id' => $pt_schedule_id,
                     ]);
                 }
             }
-        }
 
-        // ===== 食事の更新 =====
-        TMeal::where('pt_schedule_id', $pt_schedule_id)->delete();
+            // ===== 看護ケアの更新 =====
+            TCarekind::where('pt_id', $pt_id)
+                ->whereDate('daily_schedule_date', $today)
+                ->delete();
 
-        $selectedMealIds = array_filter($request->input('meal', []));
-
-        if (!empty($selectedMealIds)) {
-            foreach ($selectedMealIds as $mealId) {
-                $mealRecords = MMeal::where('meal_id', $mealId)->first();
-                $sameMealRecords = MMeal::where('food_name', $mealRecords->food_name)
-                    ->where('food_form', $mealRecords->food_form)
-                    ->get();
-
-                foreach ($sameMealRecords as $record) {
-                    TMeal::create([
-                        'pt_schedule_id' => $pt_schedule_id,
-                        'meal_id' => $record->meal_id,
+            foreach (array_filter($request->input('care', [])) as $care_id) {
+                if (!empty($care_id)) {
+                    TCarekind::create([
                         'pt_id' => $pt_id,
+                        'care_kind_id' => $care_id,
                         'daily_schedule_date' => $today,
-                    ]);
-                }
-            }
-
-        }
-
-        // ===== 薬データの更新 =====
-        TMedicine::where('pt_schedule_id', $pt_schedule_id)->delete();
-        $selectedMedicineIds = array_filter($request->input('medicine', []));
-
-        if (!empty($selectedMedicineIds)) {
-            foreach ($selectedMedicineIds as $medicineId) {
-
-                // 1. IDからレコード取得し、薬名を取得
-                $medicine = MMedicine::where('medicine_id', $medicineId)->first();
-
-                if (!$medicine) {
-                    // レコードがなければ次へ
-                    continue;
-                }
-
-                $targetDrugName = $medicine->drug_name;
-
-                // 2. 薬名が同じレコードをすべて取得
-                $sameDrugRecords = MMedicine::where('drug_name', $targetDrugName)->get();
-
-                // 3. 取得したレコードの medicine_id を使って登録などの処理
-                foreach ($sameDrugRecords as $record) {
-                    TMedicine::create([
                         'pt_schedule_id' => $pt_schedule_id,
-                        'medicine_id' => $record->medicine_id,  // ここはオブジェクトから取り出す
-                        'daily_schedule_date' => $today,
                     ]);
                 }
             }
+
+            // ===== 治療データの更新 =====
+            TTreatmentkind::where('pt_id', $pt_id)
+                ->whereDate('daily_schedule_date', $today)
+                ->delete();
+
+            $treatmentkindArray = $request->input('treatment', []); // ['treatment' => [id, id], ...]
+
+            foreach ($treatmentkindArray as $category => $treatmentIds) {
+                foreach ($treatmentIds as $treatment_id) {
+                    if (!empty($treatment_id)) {
+                        TTreatmentkind::create([
+                            'pt_id' => $pt_id,
+                            'treatment_kind_id' => $treatment_id,
+                            'daily_schedule_date' => $today,
+                            'pt_schedule_id' => $pt_schedule_id,
+                        ]);
+                    }
+                }
+            }
+
+            // ===== 食事の更新 =====
+            TMeal::where('pt_schedule_id', $pt_schedule_id)->delete();
+
+            $selectedMealIds = array_filter($request->input('meal', []));
+
+            if (!empty($selectedMealIds)) {
+                foreach ($selectedMealIds as $mealId) {
+                    $mealRecords = MMeal::where('meal_id', $mealId)->first();
+                    $sameMealRecords = MMeal::where('food_name', $mealRecords->food_name)
+                        ->where('food_form', $mealRecords->food_form)
+                        ->get();
+
+                    foreach ($sameMealRecords as $record) {
+                        TMeal::create([
+                            'pt_schedule_id' => $pt_schedule_id,
+                            'meal_id' => $record->meal_id,
+                            'pt_id' => $pt_id,
+                            'daily_schedule_date' => $today,
+                        ]);
+                    }
+                }
+
+            }
+
+            // ===== 薬データの更新 =====
+            TMedicine::where('pt_schedule_id', $pt_schedule_id)->delete();
+            $selectedMedicineIds = array_filter($request->input('medicine', []));
+
+            if (!empty($selectedMedicineIds)) {
+                foreach ($selectedMedicineIds as $medicineId) {
+
+                    // 1. IDからレコード取得し、薬名を取得
+                    $medicine = MMedicine::where('medicine_id', $medicineId)->first();
+
+                    if (!$medicine) {
+                        // レコードがなければ次へ
+                        continue;
+                    }
+
+                    $targetDrugName = $medicine->drug_name;
+
+                    // 2. 薬名が同じレコードをすべて取得
+                    $sameDrugRecords = MMedicine::where('drug_name', $targetDrugName)->get();
+
+                    // 3. 取得したレコードの medicine_id を使って登録などの処理
+                    foreach ($sameDrugRecords as $record) {
+                        TMedicine::create([
+                            'pt_schedule_id' => $pt_schedule_id,
+                            'medicine_id' => $record->medicine_id,  // ここはオブジェクトから取り出す
+                            'daily_schedule_date' => $today,
+                        ]);
+                    }
+                }
+            }
+
+            // ===== [6] 完了後リダイレクト =====
+            return redirect()->route('patient.information', ['pt_id' => $pt_id]);
+
+        } catch (Exception $erorr) {
+            Log::error('透析、食事、薬、看護ケア、治療の更新エラーログです');
         }
 
-        // ===== [6] 完了後リダイレクト =====
-        return redirect()->route('patient.information', ['pt_id' => $pt_id]);
     }
 }
