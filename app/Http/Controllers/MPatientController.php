@@ -19,6 +19,7 @@ use App\Models\TPtschedule;
 use App\Models\TMedicine;
 use App\Models\TMeal;
 use Date;
+use Exception;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
 use App\Http\Requests\StorePatientRequest;
@@ -71,32 +72,36 @@ class MPatientController extends Controller
     //patient登録処理・バリデーション処理はRequestファイルに専用のクラス作成
     public function store(StorePatientRequest $request)
     {
-        // sex が 0〜3 以外の場合、一覧にリダイレクト
-        if (!in_array($request->sex, [0, 1, 2, 3])) {
-            return redirect()->route('patient.index')->with('error', '性別の値が不正です');
+        try {
+            // sex が 0〜3 以外の場合、一覧にリダイレクト
+            if (!in_array($request->sex, [0, 1, 2, 3])) {
+                return redirect()->route('patient.index')->with('error', '性別の値が不正です');
+            }
+
+            // 患者情報の登録
+            $mp = MPatient::create([
+                'room_id' => $request->room_id,
+                'pt_name' => $request->pt_name,
+                'sex' => $request->sex,
+                'blood_type' => $request->blood_type,
+                'birthday' => $request->birthday,
+                'disease_id' => $request->disease_id,
+                'tell_number' => $request->tell_number,
+                'key_person' => $request->key_person,
+                'Dr_name' => $request->Dr_name,
+            ]);
+
+            // T_PT_SCHEDULE の初期作成
+            TPtschedule::create([
+                'pt_id' => $mp->pt_id,
+                'daily_schedule_date' => today(),
+            ]);
+
+            //登録完了後、患者一覧へ遷移
+            return redirect()->route('patient.index');
+        } catch (Exception $e) {
+            // ログなど
         }
-
-        // 患者情報の登録
-        $mp = MPatient::create([
-            'room_id' => $request->room_id,
-            'pt_name' => $request->pt_name,
-            'sex' => $request->sex,
-            'blood_type' => $request->blood_type,
-            'birthday' => $request->birthday,
-            'disease_id' => $request->disease_id,
-            'tell_number' => $request->tell_number,
-            'key_person' => $request->key_person,
-            'Dr_name' => $request->Dr_name,
-        ]);
-
-        // T_PT_SCHEDULE の初期作成
-        TPtschedule::create([
-            'pt_id' => $mp->pt_id,
-            'daily_schedule_date' => today(),
-        ]);
-
-        //登録完了後、患者一覧へ遷移
-        return redirect()->route('patient.index');
     }
 
 
