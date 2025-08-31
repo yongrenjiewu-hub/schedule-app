@@ -293,14 +293,14 @@ class MPatientController extends Controller
         try {
             $today = Carbon::now('Asia/Tokyo')->startOfDay()->toDateString();
 
-            // ===== [1] スケジュール作成・更新 =====
+            // ===== スケジュール作成・更新 =====
             $ptSchedule = TPtschedule::updateOrCreate(
                 ['pt_id' => $pt_id, 'daily_schedule_date' => $today],
                 // ['meal_id' => $request->input('meal')]
             );
             $pt_schedule_id = $ptSchedule->pt_schedule_id;
 
-            // ===== [2] 透析の更新 =====
+            // ===== 透析の更新 =====
             TPtDialysis::where('pt_id', $pt_id)
                 ->whereDate('daily_schedule_date', $today)
                 ->delete();
@@ -315,7 +315,7 @@ class MPatientController extends Controller
                 }
             }
 
-            // ===== [3] 看護ケアの更新 =====
+            // ===== 看護ケアの更新 =====
             TCarekind::where('pt_id', $pt_id)
                 ->whereDate('daily_schedule_date', $today)
                 ->delete();
@@ -331,7 +331,7 @@ class MPatientController extends Controller
                 }
             }
 
-            // ===== [4] 治療データの更新 =====
+            // ===== 治療データの更新 =====
             TTreatmentkind::where('pt_id', $pt_id)
                 ->whereDate('daily_schedule_date', $today)
                 ->delete();
@@ -410,7 +410,7 @@ class MPatientController extends Controller
             return redirect()->route('patient.information', ['pt_id' => $pt_id]);
 
         } catch (Exception $erorr) {
-            
+            Log::error('透析、食事、薬、看護ケア、治療の更新エラーログです');
         }
 
     }
