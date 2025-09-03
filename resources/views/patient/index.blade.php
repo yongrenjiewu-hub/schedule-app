@@ -154,7 +154,6 @@
                             <div class="schedule-info">
                                 @forelse ($patient->ptSchedules as $schedule)
                                     <div class="schedule-section">
-                                        <div>スケジュールID: {{ $schedule->pt_schedule_id ?? '未設定' }}</div>
 
                                         {{-- 透析 --}}
                                         @foreach ($schedule->dialysis as $dialysis)

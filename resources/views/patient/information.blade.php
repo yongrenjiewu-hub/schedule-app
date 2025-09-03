@@ -230,14 +230,6 @@
     </div>
 
 
-
-
-            {{-- </div>
-        @empty
-            <p>スケジュールなし</p>
-        @endforelse
-    </div> --}}
-
     {{-- 右カラム --}}
     <div class="right-column">
         <div class="record-form">
