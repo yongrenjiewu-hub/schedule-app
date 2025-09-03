@@ -86,17 +86,18 @@ class TPtscheduleController extends Controller
         //薬マスタ情報取得
         $m_medicine = MMedicine::all();
 
-        // 登録済みの薬の薬名配列をコントローラーで作成
         if ($request->isMethod('post')) {
             $medicineInput = $request->input('medicine', []);
             $selectedMedicineIds = is_array($medicineInput)
                 ? array_unique(array_filter($medicineInput))
                 : [$medicineInput];
         } else {
-            // GET時はDBから取得
-            $selectedMedicineIds = $t_pt_schedule->medicines->pluck('medicine_id')->toArray();
-
+            // GET時はDBから取得、ただし $t_pt_schedule が null なら空配列にする
+            $selectedMedicineIds = $t_pt_schedule && $t_pt_schedule->medicines
+                ? $t_pt_schedule->medicines->pluck('medicine_id')->toArray()
+                : [];
         }
+        
 
 
         // 1つの共通配列に変換して sortBy する

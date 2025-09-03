@@ -193,7 +193,7 @@
             </div>
 
             <div class="info-box">
-                <h2>食事</h2>
+                <h2><a href="{{ route('meal.index', ['pt_id' => $m_patient->pt_id]) }}">食事</a></h2>
 
                 @if ($m_patient)
                     @forelse ($m_patient->ptSchedules as $schedule)
@@ -208,7 +208,7 @@
                                     </li>
                                 @endforeach
                             </ul>
-                        @endif
+                        @endif  
                     @empty
                         <div class="no-data">スケジュールがありません。</div>
                     @endforelse
@@ -227,8 +227,7 @@
 
             @foreach ($m_patient->ptSchedulesAll as $schedule)
                 @if ($schedule->daily_schedule_date === $today)
-                    <div>スケジュールID: {{ $schedule->pt_schedule_id }}</div>
-                    <div>薬の数: {{ $schedule->medicines->count() }}</div>
+        
 
                     @forelse ($schedule->medicines as $tMedicine)
                         <div>

@@ -113,15 +113,25 @@ class MPatientController extends Controller
 
         $patients = MPatient::get()->groupBy('room_id');
 
+        // 今日の日付
+        $today = Carbon::today();
+
+        // スケジュール（今日だけ）取得
         $m_patient = MPatient::with([
-            'ptSchedulesAll.dialysis.dialysisMaster',
-            'ptSchedulesAll.treatmentkind.treatmentkindMaster',
-            'ptSchedulesAll.carekind.carekindMaster',
-            'ptSchedulesAll.meal',
-            'ptSchedulesAll.medicines.medicineMaster',
+            'ptSchedulesAll' => function ($query) use ($today) {
+                $query->whereDate('daily_schedule_date', $today)
+                    ->with([
+                        'dialysis.dialysisMaster',
+                        'treatmentkind.treatmentkindMaster',
+                        'carekind.carekindMaster',
+                        'meal',
+                        'medicines.medicineMaster'
+                    ]);
+            },
             'disease',
             'records'
         ])->findOrFail($pt_id);
+
 
         $diseas = MDisease::where('disease_id', $pt_id)->get();
 
