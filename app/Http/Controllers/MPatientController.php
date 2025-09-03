@@ -110,33 +110,42 @@ class MPatientController extends Controller
     //患者情報画面
     public function information(Request $request, $pt_id)
     {
-
         $patients = MPatient::get()->groupBy('room_id');
+        $today = Carbon::today();
 
-        $m_patient = MPatient::with([
-            'ptSchedulesAll.dialysis.dialysisMaster',
-            'ptSchedulesAll.treatmentkind.treatmentkindMaster',
-            'ptSchedulesAll.carekind.carekindMaster',
-            'ptSchedulesAll.meal',
-            'ptSchedulesAll.medicines.medicineMaster',
-            'disease',
-            'records'
-        ])->findOrFail($pt_id);
+        // 今日のスケジュールだけ取得し、関連もロード
+        $todaySchedules = TPtschedule::where('pt_id', $pt_id)
+            ->whereDate('daily_schedule_date', $today)
+            ->with([
+                'dialysis.dialysisMaster',
+                'treatmentkind.treatmentkindMaster',
+                'carekind.carekindMaster',
+                'meal',
+                'medicines.medicineMaster'
+            ])
+            ->get();
 
-        $diseas = MDisease::where('disease_id', $pt_id)->get();
-
-        $schedule = $m_patient->ptSchedulesAll->first();
+        $m_patient = MPatient::with(['disease', 'records'])->findOrFail($pt_id);
 
         $documents = TMedicalrecord::where('pt_id', $pt_id)->latest()->get();
 
-        // ここで treatmentkind をカテゴリごとにグルーピング（例）
-        if ($schedule) {
-            $treatmentkindsGrouped = $schedule->treatmentkind->groupBy(function ($item) {
+        // 今日のスケジュールがあれば治療をカテゴリ別にグルーピング
+        $treatmentkindsGrouped = collect();
+        if ($todaySchedules->isNotEmpty()) {
+            $firstSchedule = $todaySchedules->first();
+            $treatmentkindsGrouped = $firstSchedule->treatmentkind->groupBy(function ($item) {
                 return optional($item->treatmentkindMaster)->category ?? 'その他';
             });
-        } else {
-            $treatmentkindsGrouped = collect();
         }
+
+        // 今日のスケジュールに含まれる薬のID一覧（チェック状態の保持に使う）
+        $todayMedicineIds = $todaySchedules
+            ->flatMap(fn($schedule) => $schedule->medicines->pluck('medicine_id'))
+            ->unique()
+            ->values();
+
+        // 薬マスタ一覧（チェックボックス表示用）
+        $all_medicines = MMedicine::all();
 
         // カテゴリの日本語ラベル
         $categoryLabels = [
@@ -152,11 +161,15 @@ class MPatientController extends Controller
             'patients',
             'm_patient',
             'documents',
-            'request',
             'treatmentkindsGrouped',
             'categoryLabels',
+            'todaySchedules',
+            'todayMedicineIds',
+            'all_medicines'
         ));
     }
+
+
 
 
     //患者情報画面内のカルテ登録

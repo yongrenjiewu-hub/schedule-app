@@ -33,6 +33,12 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
+// user登録（register）にアクセスしようとしたら404エラーにする
+Route::get('/register', function () {
+    abort(404);
+});
+
+
 //認証ユーザのみアクセル可能なグループに全てまとめる
 Route::middleware('auth')->group(function () {
     // 認証が必要なルートここにまとめる
@@ -174,4 +180,9 @@ Route::middleware('auth')->group(function () {
         // 薬削除
         Route::delete('/{id}', [MMedicineController::class, 'destroy'])->name('medicine.delete');
     });
+});
+
+// エラーメッセージが発生したら404で返す
+Route::fallback(function () {
+    return response()->view('errors.404', [], 404);
 });

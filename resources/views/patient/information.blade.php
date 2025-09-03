@@ -141,7 +141,12 @@
 <div class="main-content">
     {{-- 左カラム --}}
     <div class="left-column">
-        @forelse ($m_patient->ptSchedules as $schedule)
+        @php
+            $schedule = $todaySchedules->first();
+        @endphp
+
+        @if ($schedule)
+            {{-- 透析 --}}
             <div class="info-box">
                 <h3><a href="{{ route('dialysis.index', ['pt_id' => $m_patient->pt_id]) }}">透析</a></h3>
                 @foreach ($schedule->dialysis as $d)
@@ -152,18 +157,15 @@
                 @endforeach
             </div>
 
+            {{-- 治療 --}}
             <div class="info-box">
-                <h3>
-                    <a href="{{ route('treatmentkind.index', ['pt_id' => $m_patient->pt_id]) }}">治療</a>
-                </h3>
-            
+                <h3><a href="{{ route('treatmentkind.index', ['pt_id' => $m_patient->pt_id]) }}">治療</a></h3>
+
                 @php
-                    // カテゴリでグループ化（null安全）
                     $groupedTreatment = $schedule->treatmentkind->groupBy(function($item) {
                         return optional($item->treatmentkindMaster)->category ?? 'その他';
                     });
-            
-                    // カテゴリの日本語ラベル
+
                     $categoryLabels = [
                         'treatment' => '治療',
                         'check' => '検査',
@@ -173,7 +175,7 @@
                         'その他' => 'その他',
                     ];
                 @endphp
-            
+
                 @foreach ($groupedTreatment as $category => $items)
                     <h4>{{ $categoryLabels[$category] ?? $category }}</h4>
                     <ul>
@@ -183,8 +185,8 @@
                     </ul>
                 @endforeach
             </div>
-            
 
+            {{-- ケア --}}
             <div class="info-box">
                 <h3><a href="{{ route('carekind.index', ['pt_id' => $m_patient->pt_id]) }}">ケア</a></h3>
                 @foreach ($schedule->carekind as $c)
@@ -192,63 +194,49 @@
                 @endforeach
             </div>
 
+            {{-- 食事 --}}
             <div class="info-box">
-                <h2>食事</h2>
-
-                @if ($m_patient)
-                    @forelse ($m_patient->ptSchedules as $schedule)
-                        @if ($schedule->meals->isEmpty())
-                            <div class="no-data">食事なし（スケジュールID: {{ $schedule->pt_schedule_id }}）</div>
-                        @else
-                            <ul>
-                                @foreach ($schedule->meals as $meal)
-                                    <li class="meal-item">
-                                        食事: {{ $meal->food_name ?? '未設定' }}<br>
-                                        形態: {{ $meal->food_form ?? '未設定' }}
-                                    </li>
-                                @endforeach
-                            </ul>
-                        @endif
-                    @empty
-                        <div class="no-data">スケジュールがありません。</div>
-                    @endforelse
+                <h3><a href="{{ route('meal.index', ['pt_id' => $m_patient->pt_id]) }}">食事</a></h3>
+                @if ($schedule->meals->isEmpty())
+                    <div class="no-data">食事なし</div>
                 @else
-                    <div class="no-data">患者が選択されていません。</div>
+                    <ul>
+                        @foreach ($schedule->meals as $meal)
+                            <li class="meal-item">
+                                食事: {{ $meal->food_name ?? '未設定' }}<br>
+                                形態: {{ $meal->food_form ?? '未設定' }}
+                            </li>
+                        @endforeach
+                    </ul>
                 @endif
             </div>
 
-            {{-- 薬は当日分のみ --}}
-            @php
-            $today = \Carbon\Carbon::today()->toDateString();
-            @endphp
-
+            {{-- 薬 --}}
             <div class="info-box">
-            <h3><a href="{{ route('medicine.index', ['pt_id' => $m_patient->pt_id]) }}">薬</a></h3>
-
-            @foreach ($m_patient->ptSchedulesAll as $schedule)
-                @if ($schedule->daily_schedule_date === $today)
-                    <div>スケジュールID: {{ $schedule->pt_schedule_id }}</div>
-                    <div>薬の数: {{ $schedule->medicines->count() }}</div>
-
-                    @forelse ($schedule->medicines as $tMedicine)
-                        <div>
-                            薬: {{ optional($tMedicine->medicineMaster)->drug_name ?? '未設定' }}<br>
-                            用法: {{ optional($tMedicine->medicineMaster)->usage ?? '未設定' }}<br>
-                            時間帯: {{ optional($tMedicine->medicineMaster)->medicine_time_label ?? '未設定' }}
-                        </div>
-                    @empty
-                        <div>登録された薬がありません。</div>
-                    @endforelse
-                @endif
-            @endforeach
+                <h3><a href="{{ route('medicine.index', ['pt_id' => $m_patient->pt_id]) }}">薬</a></h3>
+                @forelse ($schedule->medicines as $tMedicine)
+                    <div>
+                        薬: {{ optional($tMedicine->medicineMaster)->drug_name ?? '未設定' }}<br>
+                        用法: {{ optional($tMedicine->medicineMaster)->usage ?? '未設定' }}<br>
+                        時間帯: {{ optional($tMedicine->medicineMaster)->medicine_time_label ?? '未設定' }}
+                    </div>
+                @empty
+                    <div>登録された薬がありません。</div>
+                @endforelse
             </div>
+        @else
+            <p>本日のスケジュールがありません。</p>
+        @endif
+    </div>
 
 
-            </div>
+
+
+            {{-- </div>
         @empty
             <p>スケジュールなし</p>
         @endforelse
-    </div>
+    </div> --}}
 
     {{-- 右カラム --}}
     <div class="right-column">

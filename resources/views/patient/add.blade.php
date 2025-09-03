@@ -228,7 +228,7 @@
                 @foreach ($m_meal as $meal)
                     <option value="{{ $meal->meal_id }}"
                         @if(in_array($meal->meal_id, $selectedMealIds ?? [])) selected @endif>
-                        {{ $meal->food_name }} : {{ $meal->food_form }} ({{ $meal->food_time_label }})
+                        {{ $meal->food_name }} : {{ $meal->food_form }} : ({{ $meal->food_time_label }})
                     </option>
                 @endforeach
             </select>
