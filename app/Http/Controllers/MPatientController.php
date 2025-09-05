@@ -30,22 +30,27 @@ use Carbon\Carbon;
 
 class MPatientController extends Controller
 {
-    //Patient一覧表示
     public function index($id = null)
     {
-        // 部屋ごとに患者をグループ化し、情報をネストで取得
-        // 複数のディレクトリをコレクションとして取得
+        $today = Carbon::now('Asia/Tokyo')->toDateString(); // ← 今日の日付
+
         $patients = MPatient::with([
-            'ptSchedules.dialysis.dialysisMaster',
-            'ptSchedules.treatmentkind.treatmentkindMaster',
-            'ptSchedules.carekind.carekindMaster',
-            'ptSchedules.meal',
-            'ptSchedules.meals',  // ★食事の中間テーブル（t_meal）経由
-            'ptSchedules.medicines.medicineMaster', // ★薬とそのマスター
+            // 今日の ptSchedules のみ取得
+            'ptSchedules' => function ($query) use ($today) {
+                $query->whereDate('daily_schedule_date', $today)
+                    ->with([
+                        'dialysis.dialysisMaster',
+                        'treatmentkind.treatmentkindMaster',
+                        'carekind.carekindMaster',
+                        'meal',
+                        'meals',
+                        'medicines.medicineMaster',
+                    ]);
+            },
             'disease'
         ])->get()->groupBy('room_id');
 
-        // $idがnullなら最初の患者IDをセット（例）
+        // $idがnullなら最初の患者IDをセット
         if (is_null($id)) {
             $firstPatient = MPatient::first();
             $id = $firstPatient ? $firstPatient->pt_id : null;
@@ -53,13 +58,26 @@ class MPatientController extends Controller
 
         $m_patient = null;
         if ($id) {
-            $m_patient = MPatient::with('ptSchedulesAll.medicines.medicineMaster')->find($id);
+            // ptSchedulesAll の代わりに当日だけ絞った ptSchedules を取得
+            $m_patient = MPatient::with([
+                'ptSchedules' => function ($query) use ($today) {
+                    $query->whereDate('daily_schedule_date', $today)
+                        ->with([
+                            'dialysis.dialysisMaster',
+                            'treatmentkind.treatmentkindMaster',
+                            'carekind.carekindMaster',
+                            'meal',
+                            'meals',
+                            'medicines.medicineMaster',
+                        ]);
+                },
+                'disease'
+            ])->find($id);
         }
-
-        $today = Carbon::now('Asia/Tokyo')->startOfDay()->toDateString(); // ← これに統一
 
         return view('patient.index', compact('patients', 'm_patient', 'today'));
     }
+
 
 
     //登録画面表示
