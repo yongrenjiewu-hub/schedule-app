@@ -60,8 +60,12 @@ class TAssignedController extends Controller
 
         foreach ($assignedPatients as $roomPatients) {
             foreach ($roomPatients as $patient) {
+                // スケジュールを今日だけにフィルター
+                $patient->ptSchedules = $patient->ptSchedules->filter(function ($schedule) use ($today) {
+                    return Carbon::parse($schedule->daily_schedule_date)->isSameDay($today);
+                });
+        
                 foreach ($patient->ptSchedules as $schedule) {
-                    // 各カテゴリの時間をまとめる
                     $times = [];
         
                     foreach ($schedule->carekind as $care) {
@@ -92,7 +96,6 @@ class TAssignedController extends Controller
                         $times[] = $med->Nmedicine_date;
                     }
         
-                    // null を除外し、整形
                     $times = array_filter($times);
         
                     foreach ($times as $time) {
@@ -105,7 +108,8 @@ class TAssignedController extends Controller
                     }
                 }
             }
-        } 
+        }
+        
 
         return view('assigned.index', [
             'patients' => $assignedPatients,
