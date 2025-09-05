@@ -92,7 +92,7 @@ class TPtscheduleController extends Controller
                 ? array_unique(array_filter($medicineInput))
                 : [$medicineInput];
         } else {
-            // GET時はDBから取得、ただし $t_pt_schedule が null なら空配列にする
+            // GET時はDBから取得、ただし $t_pt_schedule が null なら空配列にする これにより本日分のスケジュールがなくてもブラウザに表示される
             $selectedMedicineIds = $t_pt_schedule && $t_pt_schedule->medicines
                 ? $t_pt_schedule->medicines->pluck('medicine_id')->toArray()
                 : [];
