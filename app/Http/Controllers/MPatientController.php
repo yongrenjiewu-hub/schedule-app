@@ -124,6 +124,15 @@ class MPatientController extends Controller
         }
     }
 
+    // 患者情報削除
+        public function destroy($pt_id)
+        {
+            $patient = MPatient::findOrFail($pt_id);
+            $patient->delete(); // ソフトデリート
+            return redirect()->route('patient.index')->with('success', '患者を削除しました');
+        }
+
+
 
     //患者情報画面
     public function information(Request $request, $pt_id)

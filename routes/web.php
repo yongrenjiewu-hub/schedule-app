@@ -64,6 +64,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/information/documents', [MPatientController::class, 'information'])->name('document.information');
         Route::post('/information/documents', [MPatientController::class, 'extra'])->name('document.extra');
 
+        //患者情報削除
+        Route::delete('/{pt_id}', [MPatientController::class, 'destroy'])->name('patient.destroy');
     });
 
     Route::prefix('assigned')->middleware('auth')->group(function () {
