@@ -150,6 +150,14 @@
                                 <button type="submit">My患者追加</button>
                             </form>
 
+                            {{-- 患者情報削除 --}}
+                            <form action="{{ route('patient.destroy', $patient->pt_id) }}" method="POST" onsubmit="return confirm('本当に削除しますか？')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit">削除</button>
+                            </form>
+                            
+
                             {{-- スケジュール --}}
                             <div class="schedule-info">
                                 @forelse ($patient->ptSchedules as $schedule)

@@ -45,25 +45,21 @@ class TPtscheduleController extends Controller
         ])
             ->where('user_id', $userId)
             ->get()
-            ->unique('pt_id'); // ← 重複患者を排除
-
-        $patients = $assignedPatients
-        ->pluck('patient')
-        ->filter()
-        ->unique('pt_id')
-        ->groupBy('room_id');
-        
+            ->pluck('patient')     // ← 患者情報だけ取り出す
+            ->filter()             // ← null（削除済み）除外
+            ->unique('pt_id')      // ← 重複除外
+            ->values();            // ← index を 0 から振り直す（optional）
 
         // TAssigned ではなく patient を groupBy
         $groupedPatients = $assignedPatients
-            ->pluck('patient')
+            // ->pluck('patient')
             ->filter()
             ->groupBy('room_id');
 
         // $idがnullなら最初の患者IDをセット
         if (is_null($id)) {
             $firstPatient = $assignedPatients->first();
-            $id = $firstPatient ? $firstPatient->patient->pt_id : null;
+            $id = $firstPatient ? $firstPatient->id : null;
         }
 
         //patient情報
@@ -97,15 +93,23 @@ class TPtscheduleController extends Controller
                 ? $t_pt_schedule->medicines->pluck('medicine_id')->toArray()
                 : [];
         }
-        
-
 
         // 1つの共通配列に変換して sortBy する
         foreach ($assignedPatients as $assigned) {
-            foreach ($assigned->patient->ptSchedules as $schedule) {
+            if (!$assigned->patient) {
+                // patientがnullなら次へスキップ
+                continue;
+            }
+        }
+        // TAssigned のコレクションから患者コレクションに変換済みと仮定
+        $patients = $assignedPatients->filter()->unique('pt_id')->values();
+
+        // 患者ごとのスケジュールに sortedItems をセット
+        foreach ($patients as $patient) {
+            foreach ($patient->ptSchedules as $schedule) {
                 $allItems = collect();
 
-                // === ケア
+                // ケア
                 foreach ($schedule->carekind as $item) {
                     $master = $item->carekindMaster;
                     if ($master) {
@@ -124,7 +128,7 @@ class TPtscheduleController extends Controller
                     }
                 }
 
-                // === 治療
+                // 治療
                 foreach ($schedule->treatmentkind as $item) {
                     $master = $item->treatmentkindMaster;
                     if ($master) {
@@ -143,7 +147,7 @@ class TPtscheduleController extends Controller
                     }
                 }
 
-                // === 透析
+                // 透析
                 foreach ($schedule->dialysis as $item) {
                     $master = $item->dialysisMaster;
                     if ($master && $master->dialysis_date) {
@@ -157,7 +161,7 @@ class TPtscheduleController extends Controller
                     }
                 }
 
-                // === 食事
+                // 食事
                 $meals = $schedule->meals ?? collect();
                 foreach ($meals as $meal) {
                     $time = $meal->food_time;
@@ -172,7 +176,7 @@ class TPtscheduleController extends Controller
                     }
                 }
 
-                // === 薬
+                // 薬
                 foreach ($schedule->medicines as $medicine) {
                     $master = $medicine->medicineMaster;
                     if ($master && $master->medicine_time) {
@@ -186,11 +190,10 @@ class TPtscheduleController extends Controller
                     }
                 }
 
-                // === 時間でソート
+                // 時間でソート
                 $schedule->sortedItems = $allItems->sortBy('time')->values();
             }
         }
-
 
 
         return view('schedule.index', compact(

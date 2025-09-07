@@ -45,14 +45,20 @@ class TAssignedController extends Controller
             $id = $firstPatient ? $firstPatient->pt_id : null;
         }
 
-        $m_patient = MPatient::with([
-            'ptSchedulesAll.dialysis.dialysisMaster',
-            'ptSchedulesAll.treatmentkind.treatmentkindMaster',
-            'ptSchedulesAll.carekind.carekindMaster',
-            'ptSchedulesAll.meal',
-            'ptSchedulesAll.medicines.medicineMaster',
-            'disease',
-        ])->findOrFail($id);
+        if ($id) {
+            $m_patient = MPatient::with([
+                'ptSchedulesAll.dialysis.dialysisMaster',
+                'ptSchedulesAll.treatmentkind.treatmentkindMaster',
+                'ptSchedulesAll.carekind.carekindMaster',
+                'ptSchedulesAll.meal',
+                'ptSchedulesAll.medicines.medicineMaster',
+                'disease',
+            ])->findOrFail($id);
+        } else {
+            $m_patient = null; // 患者がいないケース
+        }
+        
+
 
         $today = Carbon::now('Asia/Tokyo')->startOfDay()->toDateString();
 
@@ -60,6 +66,11 @@ class TAssignedController extends Controller
 
         foreach ($assignedPatients as $roomPatients) {
             foreach ($roomPatients as $patient) {
+                // nullチェックを追加！
+                if (!$patient) {
+                    continue;
+                }
+
                 // スケジュールを今日だけにフィルター
                 $patient->ptSchedules = $patient->ptSchedules->filter(function ($schedule) use ($today) {
                     return Carbon::parse($schedule->daily_schedule_date)->isSameDay($today);
